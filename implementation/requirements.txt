@@ -1,20 +1,5 @@
-# Notebook
 jupyterlab
 ipykernel
-
-# Numerics and plots
 numpy
-scipy
-pandas
+torch
 matplotlib
-
-# Poker: hand-history parsing (PHH) and hand evaluation (E[HS^2] buckets)
-pokerkit
-phevaluator
-
-# Small games with exact answers: Kuhn, Leduc, CFR, best response
-open_spiel
-
-# Bayesian networks: drawing and cross-checking on small instances
-pgmpy
-pyagrum

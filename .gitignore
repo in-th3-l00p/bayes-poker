@@ -15,6 +15,7 @@
 
 # Downloaded data (fetch with implementation/data/fetch.sh)
 implementation/data/raw/
+implementation/data/cache/
 __pycache__/
 
 # Devbox / Python environment

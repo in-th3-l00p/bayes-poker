@@ -51,27 +51,29 @@ Since 1999, poker programs have used probabilistic models to infer an opponent's
 unseen cards from the betting. These models share three recurring defects.
 They learn only from hands that reach showdown. They treat each betting round,
 or even each single action, separately. And they assume that the opponent's
-style never changes. We propose a \emph{two-timescale probabilistic model}.
+style never changes. We study a \emph{two-timescale probabilistic model}.
 Within a hand, Bayes' rule is applied exactly, action by action, to the
 conditional PMF of the opponent's $1326$ possible hole-card pairs, using
-hand-strength features that are recomputed on every street. Across hands, an
-unobserved \emph{style} variable evolves as a Markov chain that rarely changes
-state, which captures shifts such as tilt. Whether the cards are revealed is
-completely determined by the observed betting. We show that, for this reason,
-the hidden cards of folded hands can be summed out by the total probability
-theorem without distorting what is learned. Parameters fitted this way converge
-in probability to the true ones. By contrast, the showdown-only frequency
-estimator used in earlier work converges to a provably wrong value. We confirm
-this error on $120{,}000$ Annual Computer Poker Competition (ACPC) hands, in
-which all hole cards are revealed. On top of the conditional PMF we define:
-(i)~\emph{decision certificates}, the conditional probability, given everything
-observed, that a recommended action is the best one, exact on the river;
-(ii)~an exact additive split of the change in the odds of an event across the
-individual actions; and (iii)~\emph{pattern statistics}: bluff and slow-play
-indices, model comparisons that test whether the opponent's play depends on a
-given variable, and detection of style changes during play. This draft fixes
-the model, the computations for learning and inference, and the evaluation
-protocol.
+hand-strength features recomputed on every street. Across hands, an unobserved
+\emph{style} follows a Markov chain. Because whether cards are revealed is a
+function of the observed betting, the hidden cards of folded hands can be
+summed out without distorting what is learned, while the showdown-only
+estimator of earlier work converges to a wrong value. Our contribution is
+mainly empirical: we measure all of this against the truth. On $120{,}000$
+Annual Computer Poker Competition (ACPC) hands, in which every hole card is
+known, summing out hidden cards cuts the error of the learned action
+probabilities by a factor of about 60 compared with the showdown-only estimator, and
+modelling each opponent separately brings card prediction within about $0.04$ of
+the best achievable with the same features. On $17{,}192$ held-out river
+decisions, scored exactly with the real cards, per-opponent models gain
+$1.4\pm0.7$ chips per decision over showdown-only models; population models do
+not. In spliced sequences of real bot play the style recursion identifies a
+change of opponent in a median of 11 hands. On $87{,}428$ heads-up hands
+between humans from the IRC Poker Database, the same model finds style changes
+about every 50--65 hands, against essentially none for the bots, and only
+weak evidence that big losses trigger them. We also give decision
+certificates, calibrated in Kuhn poker, and an exact additive split of the
+evidence behind each belief.
 \end{abstract}
 
 %=====================================================================
@@ -100,7 +102,30 @@ give no human-readable reason for a decision.
 
 This project targets the part those systems leave out: a \textbf{well-calibrated,
 interpretable, time-aware probabilistic model of one opponent}, together with a
-decision layer that can \emph{justify} its recommendations. Contributions:
+decision layer that can \emph{justify} its recommendations.
+
+\paragraph{What is and is not new.} Summing out the cards of folded hands is
+not new: Southey et al.~\cite{southey2005} did it, Heiberg~\cite{heiberg2013}
+proposed the same expected-count procedure we use, and the reason it is valid
+(Proposition~\ref{prop:ignorable}) is a special case of Rubin's condition for
+ignoring how data went missing~\cite{rubin1976}. What earlier work could not do
+is \emph{measure} the effect, because folded hands never show their cards. The
+ACPC logs reveal every card, which lets us score models on folded hands and
+score decisions exactly. Our contributions are therefore mainly empirical:
+\begin{itemize}
+  \item the size of the showdown-only error on real data, and two practical
+        findings needed to remove it: the strength features must be computed
+        precisely, and the starting PDF of the parameters must not pull hard
+        towards a reference that ignores hand strength;
+  \item evidence that modelling \emph{each} opponent, not a population, is what
+        turns better card reading into better decisions;
+  \item tests of style changes on play the model did not generate (spliced bot
+        sessions) and on human play (IRC heads-up hands);
+  \item decision certificates and an exact evidence split, checked for
+        calibration where the truth is known.
+\end{itemize}
+
+\paragraph{Contributions in order.}
 
 \begin{enumerate}
   \item A two-timescale model (Section~\ref{sec:model}). Within each hand, the
@@ -117,10 +142,11 @@ decision layer that can \emph{justify} its recommendations. Contributions:
   \item Decision certificates, an exact split of the evidence, and
         ``what-if'' explanations (Section~\ref{sec:decisions}); pattern
         statistics and detection of style changes (Section~\ref{sec:patterns}).
-  \item An evaluation protocol with known true answers at three scales: Kuhn
-        poker (closed form), Leduc Hold'em (exact exploitability), and ACPC
-        heads-up limit Hold'em with the hiding of folded hands simulated
-        (Section~\ref{sec:eval}).
+  \item An evaluation protocol with known true answers at three scales (Kuhn
+        poker, Leduc Hold'em, ACPC heads-up limit Hold'em) and one human data
+        set, with every modelling choice made on validation hands and the test
+        hands used once (Section~\ref{sec:eval}), and its results
+        (Section~\ref{sec:results}).
 \end{enumerate}
 
 All probabilistic tools used are those of~\cite{bertsekas2000}. Appendix~\ref{app:tools}
@@ -155,14 +181,29 @@ functions of this outcome~\BT{2.1}. For hand $h$:
         not facing a bet, $\{\mathtt{f},\mathtt{c},\mathtt{r}\}$ (fold, call,
         raise) when facing one, and $\{\mathtt{f},\mathtt{c}\}$ at the four-bet
         cap.
-  \item $\X_{h,t,j}=(t,\ \text{facing},\ \text{raises so far},\ \text{position},\
-        \text{texture}(\B_{h,t}))$ is the public context of that decision. It is
-        a function of the public history and involves no further randomness.
+  \item $\X_{h,t,j}=(t,\ \text{facing},\ \text{bets so far},\ \text{position})$
+        is the public context of that decision (80 values, about 60 of which
+        occur). It is a function of the public history and involves no further
+        randomness. Board texture is left to the strength bucket.
   \item $\R_h\in\{0,1\}$ equals $1$ if $\C_h$ is revealed. In HULHE with forced
         showing (as in ACPC), $\R_h=1$ exactly when no player folds.
   \item $\Z_h\in\{1,\dots,M\}$ is the opponent's unobserved \emph{style} during
         hand $h$, for example \{baseline, loose-aggressive, tight-passive\}.
 \end{itemize}
+
+\paragraph{Computing the buckets.} Precision matters here more than one might
+expect. If $\mathbf{E}[\mathrm{HS}^2]$ is estimated from a few random board
+completions, the error is shared by every pair on that board (one lucky
+completion makes every flush draw look strong), so pairs are sorted into the
+wrong buckets consistently. In preliminary runs on 8 ACPC matches, moving from
+six completions to the precise buckets below improved every estimator, the
+oracle most: on hands the opponent folded on the river, its average
+$-\log p(\text{true pair})$ fell from $6.28$ to $6.12$. We therefore compute the turn exactly (all 48 river cards)
+and use 64 completions on the flop, and we use the fact that boards differing
+only by a relabelling of suits have the same table up to that relabelling. There
+are only 1{,}755 flops, 16{,}432 turns and 134{,}459 rivers up to suits, so the
+buckets of all 1326 pairs on \emph{every} possible board are computed once
+(about six minutes) and looked up afterwards.
 
 Our own actions are observed. We treat them as given inputs, not as random
 variables of the model; they enter only through $\X$. We write $\mathbf{a}_h$
@@ -444,16 +485,36 @@ observed counts, then by Bayes' rule the conditional joint PDF of
 $\bm\theta_{z,x,s}$ has the same form as~\eqref{eq:prior}, with exponents
 $\lambda_z m_{x,s}(a)+\bar N_{z,x,s,a}-1$. We keep this PDF, which supplies the
 parameter uncertainty needed by the certificates of Section~\ref{sec:decisions}.
-As point values we take the location of its maximum,
-$\hat\theta_{z,x,s}(a)\propto \bar N_{z,x,s,a}+\lambda_z m_{x,s}(a)-1$,
-normalized to sum to~$1$. $\hat\varepsilon$ is computed in the same way from the
+As point values we take its expected value,
+$\hat\theta_{z,x,s}(a)\propto \bar N_{z,x,s,a}+\lambda_z m_{x,s}(a)$,
+normalized to sum to~$1$ (the location of the maximum can be negative when an
+exponent is below zero). $\hat\varepsilon$ is computed in the same way from the
 expected number of style changes, $\sum_h\sum_{z'\neq z}\xi_h(z',z)$. Treating
 expected counts as observed counts is an approximation (cf.~\cite{beal2003}).
 
+\paragraph{How strong should the starting PDF be?} The reference
+$\mathbf{m}_{x,s}$ we use is the population's action frequency in context $x$,
+which can be counted without seeing any cards; it is the same for every bucket
+$s$. A large $\lambda$ therefore pulls every bucket towards the same action
+PMF, which flattens exactly the dependence on strength through which folded
+hands are read. On validation hands $\lambda=2$ and $\lambda=20$ do equally well
+and $\lambda=200$ is clearly worse (Section~\ref{sec:results}). In a preliminary
+experiment on 8 matches, $\lambda=200$ also read hands in which the observer
+folded worse than the showdown-only model it was meant to replace.
+
+\paragraph{One model per opponent.} When the opponent's identity is known, a
+separate one-style model can be fitted for each opponent, with the population
+model as its reference: $\lambda_{\text{opp}}\,\hat{\bm\theta}^{\text{pop}}_{x,s}$
+in place of $\lambda_z\mathbf{m}_{x,s}$ in~\eqref{eq:prior}. This reference
+already depends on strength, so pulling towards it flattens nothing, and
+opponents with few hands borrow from the rest.
+
 \paragraph{Cost.} One iteration is $O(H\cdot M\cdot 1326\cdot\bar n)$, where
-$\bar n\approx 6$ is the mean number of opponent actions per hand. That is
-about $10^{10}$ elementary operations for $10^6$ hands, or minutes in
-vectorised NumPy.
+$\bar n\approx 3.6$ is the mean number of opponent actions per record. Revealed
+hands need only the true pair, so the sum over pairs is done only for folded
+hands. On a laptop CPU one iteration over $144{,}000$ records takes about 3
+seconds for $M=1$, and the procedure stops when the probability of the data
+improves by less than one part in $10^5$ (15--20 iterations).
 
 \subsection{Use during a match}\label{sec:session}
 During play we keep two things up to date. (i)~After every hand, the exponents
@@ -549,8 +610,8 @@ $\beta_K=3\beta_J$ we get $q=1/4$ exactly: the observer is indifferent, as
 equilibrium theory predicts. Now suppose that, after 40 revealed hands,
 $\beta_J$ and $\beta_K$ are independent continuous random variables on $[0,1]$
 with conditional PDFs proportional to $x^{10}(1-x)^{10}$ and $x^{18}(1-x)^{2}$
-(the $M=1$, two-action case of~\eqref{eq:prior}). Then $\E[q]\approx 0.367>1/4$,
-$d^\star=\mathtt{call}$, $\Delta=\E[4q-1]\approx 0.47$ chips, and
+(the $M=1$, two-action case of~\eqref{eq:prior}). Then $\E[q]\approx 0.364>1/4$,
+$d^\star=\mathtt{call}$, $\Delta=\E[4q-1]\approx 0.46$ chips, and
 $\pi^\star=P(q>1/4)\approx 0.978$, from $2\times10^5$ simulated samples. The call
 is certified at the $97\%$ level. The certificate also states exactly what
 would have to be true about the opponent for the call to be wrong:
@@ -639,12 +700,13 @@ the expected counts~\eqref{eq:counts}. This is an approximation, which we check
 against the true counts available in ACPC.
 
 \paragraph{Detecting a style change (tilt).} After every hand the recursive
-update~\eqref{eq:forward} gives $P(\Z_h\neq 1\mid\mathcal{O}_{1:h})$. An alarm
-fires when it exceeds $\tau$. We measure the expected delay before detection
-and the rate of false alarms against the known change points. We compare with
-a frequency count over a sliding window of recent hands, the ``decaying
-history'' rule of~\cite{southey2005}, and with a simulation-based approximation
-of the same recursion~\cite{bard2007}.
+update~\eqref{eq:forward} gives the conditional PMF of the current style. An
+alarm fires when the probability of a new style exceeds $\tau=0.9$. We measure
+the delay before detection against known change points, and compare with a
+frequency count over a sliding window of recent hands, the ``decaying history''
+rule of~\cite{southey2005}. After the fact, the forward and backward recursions
+give $P(\Z_h\neq\Z_{h-1}\mid\mathcal{O}_{1:H})$ for every hand, which lets us ask
+whether style changes follow particular events, such as a large loss.
 
 %=====================================================================
 \section{Evaluation protocol}\label{sec:eval}
@@ -658,59 +720,84 @@ Testbed & Known true answers & Opponents & Main questions\\
 \midrule
 Kuhn poker & exact conditional PMFs, equilibria & a family indexed by a few parameters & correctness of the updating and the certificates\\
 Leduc Hold'em & exact best response, exploitability & CFR $\pm$ perturbation, switching & learning, styles, decision value\\
-ACPC 2011 HULHE & every hole card revealed & 2011 competition bots & error from hidden cards, calibration at scale\\
+ACPC 2011 HULHE & every hole card revealed & 2011 competition bots & hidden cards, card prediction, decision value, change detection\\
+IRC heads-up hands & none for folded hands & human players & do humans change style; tilt\\
 \bottomrule
 \end{tabular}
-\caption{Three testbeds. Each provides known true answers that earlier
-probabilistic poker models lacked.}
+\caption{Four testbeds. The first three provide known true answers that earlier
+probabilistic poker models lacked; the fourth provides human play.}
 \label{tab:testbeds}
 \end{table}
+
+\paragraph{Splitting the data.} Every session (one opponent's hands in one
+match) is split in time: the first $60\%$ of its hands for fitting, the next
+$10\%$ for choosing settings, the last $30\%$ for testing. ACPC plays each deal
+twice with the seats swapped; the two copies hold the same deals at the same
+positions, so they always fall in the same part. Every setting (the strength
+$\lambda$ of the starting PDF, the number of styles $M\in\{1,2,3,4\}$, the
+strength $\lambda_{\text{opp}}$ of the per-opponent models) is chosen by the
+probability the model gives to the validation hands. For models with styles this
+is the predictive probability, with the style PMF before each hand computed from
+the earlier hands of the session only. The chosen models are then refitted on
+fitting and validation hands, and the test hands are used once.
 
 \paragraph{E1: Kuhn (sanity check).} Check that~\eqref{eq:filter} reproduces the
 closed-form conditional PMF for every history and every parameter value. Check
 that the certificates are calibrated: among decisions certified at level
 $1-\delta$, at least a fraction $1-\delta$ are best under the true parameters.
 
-\paragraph{E2: Leduc (learning and decisions), via OpenSpiel~\cite{lanctot2019}.}
-Opponents are CFR equilibria with scripted deviations (over-bluffing,
-under-folding), and opponents that switch deviation at known hands. Report:
-the measure $\sum_a\theta^{\text{true}}(a)\log(\theta^{\text{true}}(a)/\hat\theta(a))$,
-defined as for $\text{Leak}$, against the number of hands observed; detection
-delay and false alarms for style changes; chips won per hand by our decisions,
-compared with the equilibrium and with a model that has a single style; and
-the exploitability of our own policy, which measures the safety cost of
-exploiting.
+\paragraph{E2: Leduc (learning and decisions).} Opponents are a CFR+ equilibrium
+written in the model's own terms (contexts and buckets) with scripted deviations
+(over-bluffing, under-folding), and an opponent that switches between two of
+them at known hands. Report: the measure
+$\sum_a\theta^{\text{true}}(a)\log(\theta^{\text{true}}(a)/\hat\theta(a))$, defined
+as for $\text{Leak}$, against the number of hands observed; detection delay and
+false alarms for style changes; chips won per hand by our decisions; and the
+exploitability of our own strategy, the safety cost of exploiting. Because these
+opponents are built in the model's own form, the model is correctly specified
+here by construction; E2 checks the machinery, not realism.
 
-\paragraph{E3: ACPC HULHE (hidden cards and calibration at scale).} Because all
-cards are revealed, we can hide the opponent's cards whenever a player folded,
-reproducing the real-world situation. We compare three estimators:
-\begin{enumerate}
-  \item \textsc{Oracle}: frequency estimates from all cards (the best achievable);
-  \item \textsc{Showdown-only}: the practice of 1999--2006;
-  \item \textsc{Expected-count}: our procedure of Section~\ref{sec:learning}, with
-        and without the street-to-street link and the style layer, and with the
-        single-action model of~\cite{terry2005} as a baseline.
-\end{enumerate}
-Measures on held-out hands, \emph{including folded hands}, which only this
-dataset allows:
+\paragraph{E3: ACPC HULHE.} Because all cards are revealed, we can hide the
+opponent's cards whenever a player folded, exactly as in real play, and still
+score the result. Estimators: \textsc{Oracle} (frequencies from all true cards),
+\textsc{Showdown-only} (the practice of 1999--2006), the single-action model
+of~\cite{terry2005}, and our procedure with one style, with $M$ styles, without
+the street-to-street link, and with one model per opponent (with its own oracle
+as reference). Measures on test hands, \emph{including folded hands}:
 \begin{itemize}
-  \item the average of $-\log$ of the conditional probability that the model
-        gave to the opponent's actual cards, on each street;
+  \item the average of $-\log$ of the conditional probability given to the
+        opponent's actual pair, on each street (its exponential is the number of
+        equally likely pairs that would give the same score);
   \item the fraction of hands in which the actual pair is among the $k$ most
-        probable of the 1326 (Terry and Mihok's measure, now on thousands of
-        hands instead of 20);
+        probable of the 1326;
   \item the mean squared error~\BT{4.6} between the predicted bucket
-        probabilities and the $0$--$1$ indicators of the actual bucket;
-  \item calibration: among predictions of probability near $p$, the fraction
-        that occur should be near $p$;
-  \item the measure $\sum_a\theta^{\textsc{Oracle}}(a)\log(\theta^{\textsc{Oracle}}(a)/\hat\theta(a))$
-        for each context.
+        probabilities and the $0$--$1$ indicators of the actual bucket, and
+        calibration plots;
+  \item the parameter error against the oracle, per context;
+  \item \textbf{decision value}: on every test hand where the opponent bets or
+        raises on the river and the observer must respond, calling ends the
+        hand, so with the real cards the value of calling is known exactly. Each
+        estimator calls iff $q$ exceeds the threshold of
+        Proposition~\ref{prop:river}, using only the actions before the
+        decision; we score the realized chips;
+  \item \textbf{change detection on real play}: test hands of two bots are
+        spliced into one sequence with known switch points (segments of about
+        150 hands), and the recursion~\eqref{eq:forward} over all opponent models
+        tracks which bot is playing.
 \end{itemize}
-We treat the per-match values of each measure as independent, identically
-distributed random variables. We report their sample mean $\pm$ two standard
-deviations of the sample mean, with the variance estimated from the spread
-across matches. The central limit theorem~\BT{7.4} justifies reading this as an
-interval that holds with probability about $0.95$.
+
+\paragraph{E4: human play.} Heads-up hands from the IRC Poker
+Database~\cite{ircdb} (Section~\ref{sec:prelim}). Folded hands have no true
+cards, so we score the predictive probability of test hands for $M=1,2,3$
+styles, report the learned switching probability $\varepsilon$, and compare
+$P(\Z_h\neq\Z_{h-1}\mid\mathcal{O}_{1:H})$ after large losses with other hands.
+
+\paragraph{Uncertainty.} We treat per-session values of each measure as
+independent, identically distributed random variables and report their sample
+mean $\pm$ two standard deviations of the sample mean; the central limit
+theorem~\BT{7.4} justifies reading this as an interval of probability about
+$0.95$. Differences between estimators are computed hand by hand first, which
+removes most of the variation they share.
 
 %=====================================================================
 \section{Data and preliminary evidence}\label{sec:prelim}
@@ -719,10 +806,23 @@ interval that holds with probability about $0.95$.
 \paragraph{Data.} We use the PHH dataset~\cite{kim2024,phhdata}, a 20\,GB
 archive. It contains ACPC logs from 2009--2017 (341M fixed-limit and 279M
 heads-up no-limit hands, including duplicates), 21.6M anonymised online hands
-from 2009, and the 10{,}000 Pluribus hands. A range-request client
-(\texttt{data/fetch\_phh.py}) reads the archive's index remotely and extracts
-selected matches without downloading the whole file. The first working sample
-is 40 match files from the ACPC 2011 heads-up limit event: $120{,}000$ hands.
+from 2009, and the 10{,}000 Pluribus hands. A range-request client reads the
+archive's index remotely and extracts selected matches without downloading the
+whole file. The 2011 heads-up limit event alone has 18{,}490 match files of
+3{,}000 hands. We use the first 40 in archive order ($120{,}000$ hands, 20
+bots): Table~\ref{tab:bias} below is computed on them, and so are all model
+results.
+
+The PHH archive's human data is all no-limit. For human heads-up \emph{limit}
+play we use the IRC Poker Database~\cite{ircdb}: hands from IRC servers,
+1995--2001. We take the heads-up hands of the \texttt{\#holdem} channel in
+1998--1999. The files store each player's actions per street but not their
+order; with two players the order is forced (the small blind acts first on
+every street, and players alternate), and we keep only hands whose rebuilt
+sequence is legal ($87{,}428$ hands, $2{,}714$ players, of which $22\%$ reach
+showdown). The IRC server showed both hands at every showdown, so, as in ACPC,
+cards are hidden exactly when someone folds and Proposition~\ref{prop:ignorable}
+applies.
 
 \begin{table}[t]
 \centering\small
@@ -743,8 +843,8 @@ Preflop bucket (Chen score) & $\mathtt{f}$ & $\mathtt{c}$ & $\mathtt{r}$ & $n$ &
 (120{,}000 hands, 40 matches). The showdown-only estimator gives probability
 zero to folding and raises the estimated raising frequency with the weakest
 hands from $46.7\%$ to $58.0\%$, exactly as Proposition~\ref{prop:bias}
-predicts. The buckets use a cheap Chen-score stand-in; the main experiments
-will use E[HS$^2$] buckets.}
+predicts. These buckets use the Chen score, a cheap stand-in; the model itself
+uses $\mathbf{E}[\mathrm{HS}^2]$ buckets.}
 \label{tab:bias}
 \end{table}
 
@@ -758,37 +858,204 @@ first decision of the hand. The error grows on later streets, where $\kappa$
 depends more strongly on the action.
 
 %=====================================================================
-\section{Implementation plan}
+\section{Results}\label{sec:results}
+%=====================================================================
+
+All numbers come from the accompanying notebook, which reproduces them from the
+raw data.
+
+\subsection{E3: card prediction on ACPC test hands}
+
+\paragraph{Choices made on validation hands.} For the strength of the starting
+PDF, the probability of the validation hands is $-145{,}879$ for $\lambda=2$,
+$-145{,}887$ for $\lambda=20$ and $-145{,}988$ for $\lambda=200$. For the number of
+styles it is $-145{,}879$, $-142{,}288$, $-136{,}187$ and $-134{,}869$ for
+$M=1,\dots,4$, so $M=4$ is chosen; it is the largest value tried, and more styles
+might do better still. The per-opponent models reach $-128{,}260$ (with
+$\lambda_{\text{opp}}=1$), far above any population model.
+
+\begin{table}[t]
+\centering\small
+\begin{tabular}{@{}lcccccc@{}}
+\toprule
+& \multicolumn{4}{c}{average $-\log p(\text{true pair})$, all test hands} & \multicolumn{2}{c}{folded on the river}\\
+\cmidrule(r){2-5}\cmidrule(l){6-7}
+Estimator & preflop & flop & turn & river & opponent & observer\\
+\midrule
+uniform over consistent pairs & 7.111 & & & 6.898 & & \\
+single action~\cite{terry2005} & 7.028 & 6.938 & 6.867 & 6.813 & 6.809 & 6.743\\
+showdown only & 7.019 & 6.855 & 6.763 & 6.660 & 6.542 & 6.537\\
+expected counts, no street link & 6.997 & 6.905 & 6.859 & 6.822 & 7.022 & 6.751\\
+expected counts, $M=1$ & 6.984 & 6.828 & 6.718 & 6.604 & 6.405 & 6.518\\
+expected counts, $M=4$ & 6.945 & 6.778 & 6.624 & 6.432 & \textbf{6.324} & 6.382\\
+expected counts, per opponent & \textbf{6.903} & \textbf{6.733} & \textbf{6.556} & \textbf{6.351} & 6.453 & \textbf{6.332}\\
+\midrule
+oracle (population) & 6.976 & 6.808 & 6.701 & 6.580 & 6.254 & 6.500\\
+oracle (per opponent) & 6.891 & 6.695 & 6.521 & 6.309 & 6.032 & 6.301\\
+\bottomrule
+\end{tabular}
+\caption{Card prediction on the $72{,}000$ ACPC test records (lower is better).
+The last two columns restrict to hands that ended with a fold on the river, by
+the opponent or by the observer. Intervals ($\pm2$ standard deviations of the
+mean over 80 sessions) are given in the accompanying notebook.}
+\label{tab:cards}
+\end{table}
+
+Table~\ref{tab:cards} gives the main comparison. Four points stand out.
+\begin{enumerate}
+  \item Summing out hidden cards removes the showdown-only error in the
+        parameters. Against the population oracle, the parameter error is
+        $0.475$ for showdown-only, $0.0074$ for the one-style model and $0.0058$
+        for four styles, a factor of more than 60.
+  \item The street link matters: without re-bucketing on every street the
+        model is worse than showdown-only after the flop.
+  \item Modelling each opponent is the largest single improvement, and it comes
+        close to its own oracle on every street (within about $0.04$). Against each
+        bot's own oracle, the parameter error is $0.242$ for the population
+        model and $0.015$ for the per-opponent models.
+  \item The exception is reading the opponent's own folds on the river: there
+        the per-opponent models ($6.453$) trail both the four-style model and
+        their oracle ($6.032$). A river fold leaves no later action to confirm
+        it, so each bot's fold behaviour rests on its own sparse data.
+\end{enumerate}
+In absolute terms card prediction remains modest: on the river the best model
+does as well as a uniform choice among about $570$ pairs (from $990$), and the
+eight buckets put a floor at about $124$ pairs (a model that knew the bucket
+exactly). The dependency tests of Section~\ref{sec:patterns} computed from
+expected counts agree closely with those computed from the true counts (for
+example $6{,}501$ against $6{,}349$ for position, and $64{,}639$ against
+$64{,}468$ for strength), which supports using expected counts there.
+
+\subsection{E3: decision value on the river}
+
+\begin{table}[t]
+\centering\small
+\begin{tabular}{@{}lrr@{}}
+\toprule
+Strategy & chips per decision & difference to showdown-only\\
+\midrule
+perfect information (call exactly when ahead) & $+50.07$ & $+11.09\pm0.72$\\
+oracle, per opponent & $+40.58$ & $+1.60\pm0.66$\\
+expected counts, per opponent & $+40.38$ & $+1.41\pm0.68$\\
+expected counts, $M=4$ & $+40.02$ & $+1.04\pm0.62$\\
+expected counts, no street link & $+39.48$ & $+0.51\pm0.87$\\
+showdown only & $+38.97$ & $0$\\
+oracle (population) & $+38.84$ & $-0.13\pm0.29$\\
+expected counts, $M=1$ & $+38.64$ & $-0.34\pm0.39$\\
+always call & $+37.48$ & $-1.50\pm1.08$\\
+the bot's actual choice (raises scored as calls) & $+37.22$ & $-1.75\pm1.03$\\
+\bottomrule
+\end{tabular}
+\caption{Realized chips per decision on $17{,}192$ held-out river decisions in
+which the opponent bet or raised. Each model calls iff its $q$ exceeds the
+threshold of Proposition~\ref{prop:river}, using only the actions before the
+decision.}
+\label{tab:decisions}
+\end{table}
+
+Table~\ref{tab:decisions} answers whether better card reading gives better
+decisions. Better \emph{population} parameters do not: the population oracle
+itself is no better than showdown-only. What helps is knowing \emph{this}
+opponent. Per-opponent models gain $1.4\pm0.7$ chips per decision over the
+showdown-only model, nearly as much as their oracle, and the four-style model,
+which partly separates opponents, gains about $1.0$. Against the bots' own
+choices in these spots the per-opponent model gains about $3$ chips per
+decision, though that comparison understates the bots, whose raises are scored
+as calls. The gap to perfect information ($+50$) shows how much remains
+unknowable from the betting alone.
+
+\subsection{E3: detecting a change of opponent in real play}
+
+In 30 spliced sequences of 2{,}000 real test hands (375 switches among 19
+bots), the recursion over the per-opponent models gives the new bot probability
+above $0.9$ after a median of $11$ hands (mean $30$) and names the right bot on
+$78.7\%$ of hands. The same recursion with models that ignore cards (action
+frequencies by context only) takes a median of $12$ hands and is right on
+$71.9\%$; a sliding window of 50 hands takes $35$ and is right on $58.9\%$.
+About a fifth of the switches are never detected within their segment.
+
+\subsection{E4: style changes in human play}
+
+On the IRC heads-up hands ($1{,}072$ sessions of at least 40 hands), styles
+improve the prediction of held-out human hands: the test probability is
+$-87{,}435$ for $M=1$, $-84{,}608$ for $M=2$ and $-82{,}878$ for $M=3$, a gain of
+$0.16$ per hand for three styles. The learned switching probability is
+$\varepsilon\approx0.016$--$0.020$, a style change about every 50--65 hands. For
+the ACPC bots the same model learns $\varepsilon\approx0.0014$, so it does not
+invent switches where there are none. The three human styles differ mainly in
+aggression: bets and raises make up $64\%$, $31\%$ and $23\%$ of their actions.
+
+Whether big losses trigger changes (tilt) is only weakly supported. After
+losing a pot of at least 100 chips, the probability of a style change before
+the next hand is $0.027\pm0.005$, against $0.019$ after smaller losses and
+$0.018$ after wins. But compared within the same sessions the difference is
+$+0.005\pm0.005$ over 485 sessions: suggestive, not established.
+
+\subsection{E1 and E2: Kuhn and Leduc}
+
+In Kuhn poker the updating code reproduces the closed form to within $10^{-7}$
+(float32 rounding) on $10{,}000$ random histories. Certificates are calibrated
+and slightly conservative: decisions certified at $80\%$, $90\%$ and $95\%$ are
+right in $93.4\%$, $96.0\%$ and $97.5\%$ of $4{,}000$ simulated scenarios. The
+worked example of Section~\ref{sec:decisions} gives $\pi^\star=0.978$.
+
+In Leduc Hold'em, CFR+ reaches exploitability $0.007$ chips per hand after
+1{,}000 iterations (game value $-0.085$ for the first player). With an
+over-bluffing opponent the parameter error of the expected-count procedure
+falls from $0.035$ after 100 hands to $0.0041$ after 4{,}000, while
+the showdown-only error \emph{rises}, from $0.047$ to
+$0.17$: more data only makes it more confident in the wrong answer.
+The under-folder shows the same pattern ($0.0038$ against
+$0.11$ at 4{,}000 hands). A best response to the learned model wins
+$1.047$ chips per hand against the over-bluffer, against $0.698$ for one to the
+showdown-only model and $1.095$ with the true parameters, at the price of
+exploitability $3.2$. Against an opponent that switches between the equilibrium
+and over-bluffing, the two-style model recovers the switch rate
+($\varepsilon=0.0038$, true $0.0042$), detects a switch in a median of $26$ hands
+against $52$ for a sliding window, and its style-aware best response wins
+$0.73\pm0.13$ chips per hand, against $0.63\pm0.11$ for a one-style model and
+$0.10\pm0.10$ for the equilibrium.
+
+%=====================================================================
+\section{Limitations}
 %=====================================================================
 
 \begin{itemize}
-  \item \textbf{Parsing and features:} \texttt{bnpoker/phh.py} (done: PHH parser
-        with betting contexts). E[HS$^2$] buckets via an enumeration evaluator
-        (\texttt{phevaluator}), precomputed per board.
-  \item \textbf{Updating and learning:} vectorised NumPy over a vector of 1326
-        probabilities per hand. \texttt{pgmpy}/\texttt{pyAgrum} are used to
-        draw the model and to cross-check it on small instances, not for the
-        inner loop.
-  \item \textbf{Small games:} OpenSpiel Kuhn and Leduc for CFR equilibria, best
-        responses and exploitability.
-  \item \textbf{Explanation interface:} a report for each decision with a
-        heat-map of the conditional PMF of the opponent's cards, the
-        certificate $(\pi^\star,\Delta)$, the evidence split of
-        Proposition~\ref{prop:attr} as a waterfall chart, and the what-if
-        explanation.
+  \item \textbf{Synthetic Leduc opponents.} They are built in the model's own
+        form, so the model is correctly specified there; E2 checks the
+        machinery, not realism.
+  \item \textbf{Styles on ACPC data separate bots.} Every bot keeps one strategy
+        per match, so the style chain cannot show switching there; the spliced
+        sessions test detection on real play only with artificial switch
+        points, and the human data has no true cards for folded hands.
+  \item \textbf{$M=4$ is the largest number of styles tried}, and the validation
+        probability was still rising.
+  \item \textbf{The bucket floor.} With eight buckets, even a model that knew
+        the bucket exactly would leave about 124 equally likely pairs on the
+        river. Finer buckets, or a split of each bucket into made hands and
+        draws, would need more data per opponent.
+  \item \textbf{Approximations.} Hand strength ignores the extra overlap between
+        the two players' pairs; flop strength uses 64 random completions;
+        expected counts are treated as observed counts.
+  \item \textbf{Decisions are scored on the river only}, where calling ends the
+        hand. Earlier streets need the full look-ahead over the betting tree,
+        which is implemented for Leduc but not yet for Hold'em.
+  \item \textbf{Tilt} is suggestive but not established, and the IRC players
+        played for no money.
 \end{itemize}
 
-\paragraph{Risks.} (i)~With few hands per session the styles may be hard to tell
-apart. We mitigate this by tying style~1 to the reference and by testing first
-on simulated changes. (ii)~ACPC bots are not humans, so human-style patterns
-such as tilt are evaluated on simulated opponents, and only qualitatively on
-the 2009 online hands. (iii)~Expected chip gains before the river are
-approximate. Certificates are therefore exact only on the river; elsewhere they
-are reported as simulation estimates.
+%=====================================================================
+\section{Conclusion}
+%=====================================================================
 
-\todo{Results of E1--E3; figures: learning curves, calibration plots, leak map,
-trace of the style probabilities; discussion; related-work section expanded
-from the literature survey.}
+Summing out the cards of folded hands is the right way to learn from censored
+poker data, and on real data it removes almost all of the showdown-only error,
+provided the strength features are computed precisely and the starting PDF does
+not pull towards a strength-blind reference. Better population parameters alone
+do not improve decisions; modelling the particular opponent does, by about
+1.4 chips per contested river decision against competition bots. The same
+two-timescale model finds that humans, unlike bots, change style within a
+session, while the evidence that losses cause those changes remains weak.
 
 \appendix
 \section{Probability tools used}\label{app:tools}

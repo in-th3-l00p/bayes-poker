@@ -13,7 +13,8 @@
     ],
     "scripts": {
       "notebook": "jupyter lab notebook.ipynb",
-      "data": "data/fetch.sh"
+      "data": "data/fetch.sh acpc",
+      "data-irc": "data/fetch.sh irc"
     }
   }
 }
