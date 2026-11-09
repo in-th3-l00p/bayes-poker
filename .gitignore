@@ -12,3 +12,7 @@
 
 # macOS
 .DS_Store
+
+# Downloaded data (fetch with data/fetch.sh)
+data/raw/
+__pycache__/
