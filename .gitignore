@@ -13,6 +13,11 @@
 # macOS
 .DS_Store
 
-# Downloaded data (fetch with data/fetch.sh)
-data/raw/
+# Downloaded data (fetch with implementation/data/fetch.sh)
+implementation/data/raw/
 __pycache__/
+
+# Devbox / Python environment
+.devbox/
+.venv/
+.ipynb_checkpoints/
