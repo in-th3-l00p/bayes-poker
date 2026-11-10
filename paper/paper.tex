@@ -16,6 +16,7 @@
 \author{Catalin-George Tisca}
 \date{}
 
+\newcommand{\hy}[1]{-}
 \begin{document}
 \maketitle
 
@@ -88,15 +89,15 @@ Figure~\ref{fig:net} shows the network.
   \foreach \t/\u in {0/1,1/2,2/3} { \draw[->,dashed] (A\t) -- (A\u); }
   \node[obs] (R) at (9.2,-2.9) {$R_h$};
   \draw[->,dotted,thick] (A3) -- (R);
-  \node[hid] (Z) at (3.75,-4.4) {$Z_h$};
-  \node[hid] (Zp) at (0,-4.4) {$Z_{h-1}$};
-  \node[hid] (Zn) at (7.5,-4.4) {$Z_{h+1}$};
+  \node[hid] (Z) at (3.75,-4.4) {$Z$};
+  \node[hid] (Zp) at (0,-4.4) {$Z_{\text{prev}}$};
+  \node[hid] (Zn) at (7.5,-4.4) {$Z_{\text{next}}$};
   \draw[->] (Zp) -- (Z);
   \draw[->] (Z) -- (Zn);
   \foreach \t in {0,1,2,3} { \draw[->] (Z) -- (A\t); }
   \begin{scope}[on background layer]
     \node[draw,rounded corners,dashed,fit=(C)(S0)(A0)(A3)(B1)(R),inner sep=2mm,
-          label={[font=\scriptsize,anchor=north east]north east:hand $h$}] {};
+          label={[font=\scriptsize,anchor=north east]north east:this hand}] {};
   \end{scope}
 \end{tikzpicture}
 \caption{The network. Inside a hand (dashed box), the opponent's cards $C$ and
@@ -126,8 +127,8 @@ been made, and their position (80 situations in all).
 for example ``in this situation, with a strength-2 hand, this opponent bets
 10\% of the time''. The \emph{style} $Z$ is hidden; it stands for how the
 opponent is playing right now, say cautiously or aggressively. From one hand to
-the next the style stays the same with probability $1-\varepsilon$ and
-otherwise switches, so the styles form a Markov chain.
+the next the style switches with a small probability $\varepsilon$ and
+otherwise stays the same, so the styles form a Markov chain.
 
 \paragraph{Reading the cards.} Bayes' rule gives the probability of each pair
 $c$ after the actions seen so far:
@@ -184,7 +185,7 @@ action that tends to keep hands going.
 \paragraph{Learning the table.} If all cards were known, $\theta$ would simply be
 counted: how often the opponent took each action with each strength in each
 situation. Since strengths and styles are partly hidden, we use the
-expectation--maximisation (EM) algorithm~\cite{dempster1977}, which starts
+expectation-maximisation (EM) algorithm~\cite{dempster1977}, which starts
 from a rough guess and repeats two steps until nothing changes:
 \begin{enumerate}
   \item \emph{Count with fractions.} A shown hand adds a count of 1 to its true
@@ -242,7 +243,7 @@ hands only (all $120{,}000$ hands).}
 \end{table}
 
 \noindent The bias carries over to the whole table. Measured by the usual
-distance between probability tables (Kullback--Leibler divergence, 0 when
+distance between probability tables (Kullback-Leibler divergence, 0 when
 identical), the showdown-only table is $0.475$ from the oracle; EM with folded
 hands is $0.006$, about 80 times closer.
 
@@ -250,7 +251,7 @@ hands is $0.006$, about 80 times closer.
 scores per model. Card reading is shown as an \emph{effective number of pairs}:
 the model is as unsure as if it had narrowed the opponent to this many equally
 likely pairs (lower is better; $e$ to the power of the average
-$-\log p(\text{true pair})$). Decisions are river calls and folds, scored with
+$\log\big(1/p(\text{true pair})\big)$). Decisions are river calls and folds, scored with
 the real cards over $17{,}192$ cases.
 
 \begin{table}[h]
@@ -259,10 +260,10 @@ the real cards over $17{,}192$ cases.
 \toprule
 model & pairs left on the river & chips per decision vs.\ showdown-only\\
 \midrule
-no information               & 990 & --\\
-only the last action~\cite{terry2005} & 909 & --\\
+no information               & 990 & n/a\\
+only the last action~\cite{terry2005} & 909 & n/a\\
 showdown-only                & 780 & 0\\
-EM, one style                & 738 & $-0.3\pm0.4$\\
+EM, one style                & 738 & $0.3\pm0.4$ lower\\
 EM, four styles              & 622 & $+1.0\pm0.6$\\
 EM, one model per opponent   & 573 & $+1.4\pm0.7$\\
 oracle per opponent (best possible) & 550 & $+1.6\pm0.7$\\
@@ -308,7 +309,7 @@ Against the aggressive one, an agent that ignores the opponent's actions wins
 22.7 chips per hand, and nothing beats it: the model of all opponents loses
 $11.8\pm2.9$ chips per hand relative to it, because it reads the frequent bets
 as strength and folds too often; learning online during the match recovers most
-of this ($-1.9\pm1.6$); the opponent's own model ties ($-0.3\pm1.0$). The same
+of this (only $1.9\pm1.6$ lower); the opponent's own model ties ($0.3\pm1.0$ lower). The same
 pattern appears in the PettingZoo environment~\cite{terry2021}. The lesson is
 that a model of the wrong opponent is expensive, and that learning on the fly
 limits the damage. These tests are small and the betting rule is crude.

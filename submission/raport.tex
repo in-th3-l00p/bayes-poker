@@ -34,10 +34,10 @@ una mare, \emph{big blind}.
 \textbf{Clasa} $C$ este cât de bune sunt cele două cărți: \emph{slabă},
 \emph{medie} sau \emph{puternică}. O stabilim cu \emph{scorul Chen}, o formulă
 simplă folosită de jucători (de exemplu A-A are 20 de puncte, iar 7-2 de culori
-diferite $-1{,}5$), cu praguri care împart toate cele 1326 de perechi posibile
+diferite are 1,5 puncte sub zero), cu praguri care împart toate cele 1326 de perechi posibile
 de cărți aproximativ în treimi. \textbf{Caracteristicile} sunt: poziția $S$
 (1 dacă e small blind, 0 dacă e big blind) și, pentru fiecare rundă $t=0,1,2,3$, ce a făcut
-jucătorul, $R_t$: \emph{–} (nu a ajuns să acționeze), \emph{fold},
+jucătorul, $R_t$: \emph{nimic} (nu a ajuns să acționeze), \emph{fold},
 \emph{check/call} sau \emph{bet/raise} (dacă a făcut mai multe, o păstrăm pe
 cea mai agresivă).
 
@@ -87,7 +87,7 @@ $P(\text{câștig}\mid\text{spam})$ de la laborator.
 
 \paragraph{Rezultate pe datele de test.} Folosim patru măsuri.
 \emph{Acuratețea}: cât de des clasa aleasă e cea corectă. \emph{Log-loss}:
-media lui $-\ln P(\text{clasa corectă})$; e mică dacă modelul a dat
+media lui $\ln\big(1/P(\text{clasa corectă})\big)$; e mică dacă modelul a dat
 probabilitate mare răspunsului corect și foarte mare dacă a fost sigur pe el și
 a greșit. \emph{Brier}: eroarea pătratică dintre probabilitățile date și
 răspunsul corect. Pentru ultimele două, mai mic înseamnă mai bine.
@@ -129,7 +129,7 @@ nenaiv & 0{,}682 & 0{,}840 & 0{,}777\\
 \textbf{Modelul nenaiv e mai bun la toate măsurile.} Ca să verificăm că nu
 e noroc, refacem comparația pe 1000 de seturi de test reeșantionate
 (bootstrap): în 95\% din cazuri câștigul de acuratețe e între $+2{,}3$ și
-$+3{,}3$ puncte procentuale, iar log-loss-ul scade cu $0{,}102$--$0{,}110$.
+$+3{,}3$ puncte procentuale, iar log-loss-ul scade cu o valoare între $0{,}102$ și $0{,}110$.
 Surpriza: modelul naiv are log-loss \emph{mai mare} decât referința care nu se
 uită deloc la acțiuni, deși ghicește clasa mai des. Motivul: e prea sigur pe
 el. Când spune 93\%, are dreptate doar în 68\% din cazuri (figura).
@@ -138,11 +138,11 @@ el. Când spune 93\%, are dreptate doar în 68\% din cazuri (figura).
 \begin{enumerate}\setlength{\itemsep}{1pt}
 \item \textbf{Aceeași informație numărată de mai multe ori.} Cine face fold
 preflop iese din mână, deci sigur nu mai acționează pe flop, turn și river
-($R_1=R_2=R_3=$\,„–''). Modelul naiv nu știe asta. Pentru el, „nu a acționat pe
+($R_1=R_2=R_3=$\,„nimic''). Modelul naiv nu știe asta. Pentru el, „nu a acționat pe
 flop'' e un indiciu nou de mână slabă (probabilitate $0{,}31$ la mâinile slabe
 față de $0{,}13$ la cele puternice), la fel pe turn și pe river. Așa că
 numără același fold de patru ori și ajunge la o încredere de 93\%. Modelul
-nenaiv învață că după un fold „–'' urmează sigur, oricare ar fi cărțile
+nenaiv învață că după un fold „nimic'' urmează sigur, oricare ar fi cărțile
 ($P\approx1$ pentru toate clasele), deci rundele lipsă nu mai adaugă nimic:
 aceeași acuratețe (68\%), dar o încredere de 78\%, apropiată de realitate.
 \item \textbf{Acțiunile se leagă și prin stilul jucătorului, nu doar prin
