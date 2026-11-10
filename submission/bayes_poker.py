@@ -1,31 +1,16 @@
 #!/usr/bin/env python3
-"""Clasificatori bayesieni naivi și nenaivi: ghicirea mâinii unui jucător de poker.
+"""Clasificatori bayesieni naiv si nenaiv: ghicim cat de bune sunt cartile unui jucator de poker.
 
-Problema
-    Din acțiunile unui jucător într-o mână de Texas Hold'em (doi jucători, mize
-    fixe), ghicim cât de bune sunt cele două cărți ale lui: slabă, medie sau
-    puternică (după scorul Chen al cărților).
+Date: 40 de meciuri ACPC 2011 din setul PHH (Zenodo, DOI 10.5281/zenodo.10796885).
+Clasa: scorul Chen al celor doua carti, in 3 grupe (slaba, medie, puternica).
+Caracteristici: s = 1 daca e small blind, r0..r3 = actiunea din fiecare runda
+(0 nimic, 1 fold, 2 check/call, 3 bet/raise).
 
-Date
-    40 de meciuri (120.000 de mâini) din Annual Computer Poker Competition 2011,
-    din setul public PHH (Zenodo, DOI 10.5281/zenodo.10796885, licență MIT).
-    Jurnalele arată cărțile ambilor jucători chiar și după fold, deci clasa e
-    cunoscută pentru fiecare mână.
+naiv:    P(c) P(s|c) P(r0|c)   P(r1|c)    P(r2|c)    P(r3|c)
+nenaiv:  P(c) P(s|c) P(r0|c,s) P(r1|c,r0) P(r2|c,r1) P(r3|c,r2)
 
-Caracteristici (o înregistrare = un jucător într-o mână)
-    s        1 dacă jucătorul e small blind (vorbește primul înainte de flop)
-    r0..r3   ce a făcut în fiecare rundă (preflop, flop, turn, river):
-             0 = nu a acționat, 1 = fold, 2 = check/call, 3 = bet/raise
-
-Modele
-    naiv:    P(c) P(s|c) P(r0|c)   P(r1|c)    P(r2|c)    P(r3|c)
-    nenaiv:  P(c) P(s|c) P(r0|c,s) P(r1|c,r0) P(r2|c,r1) P(r3|c,r2)
-
-Rulare
-    python3 bayes_poker.py
-    Necesită Python 3.9+, numpy și matplotlib. Prima rulare descarcă circa 45 MB
-    în ./data (doar cele 40 de fișiere necesare din arhiva de 20 GB).
-    Rezultatul e determinist (seed fixat: SEED = 0).
+Rulare: python3 bayes_poker.py (Python 3.9+, numpy, matplotlib).
+Prima rulare descarca circa 45 MB in ./data. Seed fixat: SEED = 0.
 """
 
 import io
@@ -58,11 +43,7 @@ NAIVE_PARENTS = {"s": None, "r0": None, "r1": None, "r2": None, "r3": None}
 NON_NAIVE_PARENTS = {"s": None, "r0": "s", "r1": "r0", "r2": "r1", "r3": "r2"}
 
 
-# ---------------------------------------------------------------------------
-# 1. Descărcarea datelor
-#    Arhiva de pe Zenodo are 20 GB. Citim din ea doar fișierele de care avem
-#    nevoie, cerând serverului numai anumite intervale de octeți (HTTP Range).
-# ---------------------------------------------------------------------------
+# 1. Descarcarea datelor: din arhiva de 20 GB citim doar fisierele necesare (HTTP Range).
 
 
 class RemoteFile(io.RawIOBase):
@@ -136,10 +117,7 @@ def download():
     return sorted(DATA_DIR.glob("*.phhs"))[:N_MATCHES]
 
 
-# ---------------------------------------------------------------------------
-# 2. Clasa: scorul Chen al celor două cărți
-#    O formulă simplă din poker: A-A = 20, K-K = 16, ..., 7-2 de culori diferite = -1,5.
-# ---------------------------------------------------------------------------
+# 2. Clasa: scorul Chen (A-A = 20, 7-2 de culori diferite = -1.5).
 
 
 def chen_score(cards):
@@ -162,12 +140,8 @@ def class_thresholds():
     return np.quantile(scores, [1 / 3, 2 / 3])
 
 
-# ---------------------------------------------------------------------------
-# 3. Citirea mâinilor
-#    Fiecare mână din fișierele .phhs are o listă de acțiuni, de exemplu:
-#    'd dh p1 4c2h' (p1 primește 4c 2h), 'p2 cbr 20' (p2 mărește), 'p1 f' (p1 fold),
-#    'p1 cc' (check/call), 'd db As9c2d' (se întorc cărți pe masă: începe o rundă nouă).
-# ---------------------------------------------------------------------------
+# 3. Citirea mainilor: 'd dh p1 4c2h' carti, 'p1 f' fold, 'p1 cc' check/call,
+# 'p2 cbr 20' bet/raise, 'd db ...' carti pe masa, adica runda noua.
 
 
 def read_hands(path):
@@ -206,13 +180,8 @@ def load(files):
     return classes, features, np.array(deal_seeds)
 
 
-# ---------------------------------------------------------------------------
-# 4. Clasificatorul bayesian
-#    Același cod pentru ambele modele; diferă doar „părinții” fiecărei
-#    caracteristici: în modelul naiv doar clasa, în cel nenaiv clasa și
-#    caracteristica anterioară. Probabilitățile se estimează prin numărare,
-#    cu +1 la fiecare numărătoare (netezire Laplace), ca niciuna să nu fie 0.
-# ---------------------------------------------------------------------------
+# 4. Clasificatorul: acelasi cod pentru ambele modele, difera doar parintii.
+# Probabilitatile se invata prin numarare, cu +1 (Laplace) ca niciuna sa nu fie 0.
 
 
 class BayesClassifier:
@@ -249,15 +218,7 @@ class BayesClassifier:
         return p / p.sum(axis=1, keepdims=True)
 
 
-# ---------------------------------------------------------------------------
-# 5. Măsuri de calitate
-#    acuratețe   cât de des clasa cea mai probabilă e cea corectă
-#    log-loss    media lui -ln P(clasa corectă): mică dacă modelul a dat
-#                probabilitate mare clasei corecte, foarte mare dacă a fost
-#                sigur pe el și a greșit
-#    Brier       eroarea pătratică dintre probabilități și răspunsul corect
-#    încredere   media probabilității clasei prezise
-# ---------------------------------------------------------------------------
+# 5. Masuri: acuratete, log-loss, Brier, incredere, calibrare, bootstrap.
 
 
 def evaluate(p, classes):
@@ -323,12 +284,8 @@ def show(label, values):
     return f"{label}: " + "  ".join(f"{c}={v:.3f}" for c, v in zip(CLASSES, values))
 
 
-# ---------------------------------------------------------------------------
-# 6. Experimentul
-#    Aceleași cărți sunt jucate de două ori (cu locurile schimbate), deci
-#    împărțim train/test după seed-ul cu care s-au împărțit cărțile: o mână și
-#    „geamăna” ei ajung mereu de aceeași parte.
-# ---------------------------------------------------------------------------
+# 6. Experimentul: impartim train/test dupa seed-ul cartilor, ca o mana si
+# geamana ei (aceleasi carti, locuri schimbate) sa ramana de aceeasi parte.
 
 
 def main():
