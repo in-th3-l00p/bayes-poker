@@ -14,7 +14,8 @@
     "scripts": {
       "notebook": "jupyter lab notebook.ipynb",
       "data": "data/fetch.sh acpc",
-      "data-irc": "data/fetch.sh irc"
+      "data-irc": "data/fetch.sh irc",
+      "demo": "python pettingzoo_demo.py"
     }
   }
 }

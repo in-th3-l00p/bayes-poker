@@ -12,6 +12,7 @@ Usage:
 PATTERN is an fnmatch glob on the path inside the zip, e.g.
     'poker-hand-histories/data/acpc/2011/*limit*'
 """
+
 from __future__ import annotations
 
 import argparse
@@ -154,7 +155,9 @@ def cmd_get(z: zipfile.ZipFile, pattern: str, max_files: int, out: pathlib.Path)
 
 
 def main() -> None:
-    p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    p = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
     sub = p.add_subparsers(dest="cmd", required=True)
     pl = sub.add_parser("list")
     pl.add_argument("--grep")

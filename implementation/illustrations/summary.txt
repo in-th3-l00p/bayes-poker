@@ -1,0 +1,6 @@
+300 hands per match (duplicate deals); big blinds per hand, difference to the agent with no model in brackets (± 2 sd of the mean over deals)
+
+                  |                     random |            calling station |                     maniac |         replica of TellBot
+         no model |       +1.03 (+0.00 ± 0.00) |       +1.08 (+0.00 ± 0.00) |       +2.93 (+0.00 ± 0.00) |       +1.96 (+0.00 ± 0.00)
+ population model |       +0.75 (-0.28 ± 0.30) |       +1.17 (+0.09 ± 0.12) |       +0.70 (-2.23 ± 0.52) |       +0.89 (-1.07 ± 0.44)
+  learning online |       +0.92 (-0.11 ± 0.21) |       +1.16 (+0.08 ± 0.06) |       +2.56 (-0.36 ± 0.27) |       +1.72 (-0.24 ± 0.30)

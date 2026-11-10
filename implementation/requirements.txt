@@ -3,3 +3,5 @@ ipykernel
 numpy
 torch
 matplotlib
+pettingzoo[classic]
+pygame
