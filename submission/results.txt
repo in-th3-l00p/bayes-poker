@@ -1,0 +1,58 @@
+
+40 meciuri, 240,000 înregistrări (120,000 mâini, câte una pentru fiecare jucător)
+ponderea claselor: slabă 36%, medie 38%, puternică 25%
+antrenare: 180,000 înregistrări, test: 60,000 (8 din 28 seed-uri de împărțire)
+
+REZULTATE PE DATELE DE TEST
+         model | acuratețe | log-loss | Brier | încredere
+ doar a priori |     0.382 |    1.084 | 0.657 |     0.384
+          naiv |     0.442 |    1.115 | 0.662 |     0.567
+        nenaiv |     0.469 |    1.008 | 0.610 |     0.487
+
+nenaiv față de naiv, intervale de încredere 95% (bootstrap, 1000 de repetări):
+  câștig de acuratețe: [+0.023, +0.033]
+  scădere a log-loss:  [+0.102, +0.110]
+
+matricea de confuzie, naiv (rânduri: clasa reală, coloane: clasa prezisă)
+[[10379  9535  1845]
+ [ 6823 11068  5042]
+ [ 3512  6748  5048]]
+
+matricea de confuzie, nenaiv (rânduri: clasa reală, coloane: clasa prezisă)
+[[12132  8861   766]
+ [ 7315 12318  3300]
+ [ 2944  8659  3705]]
+
+DOAR ÎNREGISTRĂRILE CU FOLD ÎNAINTE DE FLOP (6,472)
+    naiv: acuratețe 0.682, log-loss 1.130, încredere 0.935
+  nenaiv: acuratețe 0.682, log-loss 0.840, încredere 0.777
+
+PROBABILITĂȚI ÎNVĂȚATE (folosite în raport)
+  naiv, P(small blind | clasă): slabă=0.499  medie=0.498  puternică=0.504
+  naiv, P(fold preflop | clasă): slabă=0.217  medie=0.050  puternică=0.014
+  naiv, P(nicio acțiune pe flop | clasă): slabă=0.313  medie=0.163  puternică=0.130
+  naiv, P(bet pe flop | clasă): slabă=0.239  medie=0.391  puternică=0.501
+  nenaiv, P(nicio acțiune pe flop | clasă, fold preflop): slabă=1.000  medie=0.999  puternică=0.995
+  nenaiv, P(bet pe flop | clasă, check/call preflop): slabă=0.272  medie=0.327  puternică=0.394
+  nenaiv, P(bet pe flop | clasă, bet/raise preflop): slabă=0.462  medie=0.542  puternică=0.613
+  nenaiv, P(fold preflop | clasă, small blind): slabă=0.341  medie=0.082  puternică=0.017
+  nenaiv, P(fold preflop | clasă, big blind): slabă=0.094  medie=0.018  puternică=0.010
+
+CALIBRARE (încredere -> cât de des are dreptate, număr de înregistrări)
+  naiv:
+    0.44 -> 0.42  (11,854)
+    0.49 -> 0.40  (25,293)
+    0.55 -> 0.31  (4,875)
+    0.62 -> 0.54  (5,582)
+    0.72 -> 0.39  (5,491)
+    0.78 -> 0.51  (433)
+    0.94 -> 0.68  (6,472)
+  nenaiv:
+    0.39 -> 0.37  (11,389)
+    0.44 -> 0.43  (24,391)
+    0.49 -> 0.48  (13,213)
+    0.55 -> 0.55  (2,724)
+    0.69 -> 0.65  (1,811)
+    0.78 -> 0.68  (6,472)
+
+figura: /Users/intheloop/Desktop/uni/ps/bayes/submission/figures/calibration.pdf

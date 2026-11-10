@@ -22,3 +22,8 @@ __pycache__/
 .devbox/
 .venv/
 .ipynb_checkpoints/
+
+# Submission data (downloaded by submission/bayes_poker.py)
+submission/data/
+submission/__pycache__/
+submission/*.zip
